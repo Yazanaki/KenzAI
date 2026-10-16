@@ -15,11 +15,11 @@ const TEXTURE_DIR = path.join(__dirname, 'textures');
 
 // id → what it is. Textures are PNGs in cosmetics/textures/<id>.png.
 const CATALOG = [
-    { id: 'og-cape', slot: 'cape', name: 'OG Cape' },
+    { id: 'og-cape', slot: 'cape', name: 'OG Cloak' },
 ];
 const SLOTS = ['cape'];
 
-// The OG cape is for players who sign in while the client is in testing.
+// The OG cloak is for players who sign in while the client is in testing.
 const OG_BEFORE = [1, 0, 0];
 
 const CHALLENGE_TTL_MS = 2 * 60 * 1000;
@@ -58,7 +58,7 @@ function versionBefore(version, limit) {
     return false;
 }
 
-// The client reports its version. Lying only gets a cape someone could have
+// The client reports its version. Lying only gets a cloak someone could have
 // had anyway, and OG_CAPE_CLOSED=1 ends the grant for good.
 function shouldGrantOg(appVersion, env = process.env) {
     return env.OG_CAPE_CLOSED !== '1' && versionBefore(appVersion, OG_BEFORE);
