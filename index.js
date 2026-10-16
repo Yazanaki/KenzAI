@@ -18,6 +18,7 @@ const { startStockScheduler } = require('./modules/stock/stockScheduler');
 const { setupPointsEvents } = require('./modules/points/pointsevents');
 const { startBotMonitor } = require('./modules/mcbot/botmonitor');
 const { startCosmeticsServer } = require('./modules/cosmetics/cosmeticsServer');
+const { startLauncherApi } = require('./modules/launcherApi');
 
 // ============================================================
 // CLIENT SETUP
@@ -265,6 +266,9 @@ client.once('ready', async () => {
 
   console.log("🛒 Starting internal endpoint for the launcher via the API (cosmetics + sign-in codes)...");
   startCosmeticsServer(client);
+
+  console.log("🎮 Starting the Yazanaki Client API (sign-in, cosmetics, mod)...");
+  startLauncherApi(client);
 
   console.log("🤖 Starting bot offline monitor...");
   startBotMonitor(client);

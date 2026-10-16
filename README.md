@@ -221,3 +221,25 @@ View this guild's role config.
 Set a role as rank/status category.
 
 **Use it for:** maintaining role mapping and detection behavior.
+---
+
+## 🎮 Yazanaki Client API (hosted in KenzAI)
+
+KenzAI also serves the API the Yazanaki Client launcher and its in-game mod
+talk to (`modules/launcherApi/`): EmpireID sign-in with DM codes, client
+cosmetics for every player, and the mod's member list. It uses KenzAI's MySQL
+database, so `MYSQL_ENABLED=true` with the members, clans and EmpireID tables
+filled (dual-write or MySQL reads) is required. Its tables are created on
+startup.
+
+It listens on `LAUNCHER_API_PORT`, or on the panel's own port (`SERVER_PORT`)
+when that isn't set. The launcher's API address is then this server's address,
+e.g. `http://<server ip>:<port>`, or better a panel subdomain or reverse proxy
+with HTTPS pointing at that port (set `TRUST_PROXY=1` behind the proxy).
+
+`.env` options: `LAUNCHER_API_PORT`, `LAUNCHER_API_HOST` (default `0.0.0.0`),
+`TRUST_PROXY`, `OG_CAPE_CLOSED=1` (stop granting the OG cape).
+
+The routes in `modules/launcherApi/api/` are a copy of
+[YazanakiAPI](https://github.com/Yazanaki/YazanakiAPI); change them there and
+copy them over with its `scripts/sync-to-kenzai.sh`.
