@@ -299,7 +299,11 @@ client.once('ready', async () => {
   startCosmeticsServer(client);
 
   console.log("🎮 Starting the Yazanaki Client API (sign-in, cosmetics, mod)...");
-  startLauncherApi(client);
+  try {
+    startLauncherApi(client);
+  } catch (err) {
+    console.error("❌ Failed to start the Yazanaki Client API:", err.message);
+  }
 
   console.log("🤖 Starting bot offline monitor...");
   startBotMonitor(client);

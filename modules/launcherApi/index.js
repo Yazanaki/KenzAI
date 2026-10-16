@@ -19,7 +19,20 @@
 
 const mysqlPool = require("../database/mysqlPool");
 const { sendLoginCode } = require("../launcher/loginCode");
-const { createApp, ensureTables } = require("./api/app");
+
+// Loaded only when the API starts, and never fatally: if express/cors aren't
+// installed yet (npm install not run after an update), the bot keeps running.
+function loadApi() {
+  try {
+    return require("./api/app");
+  } catch (err) {
+    if (err && err.code === "MODULE_NOT_FOUND") {
+      console.warn(`[launcherApi] ⚠️ ${err.message.split("\n")[0]} — run npm install to enable the Yazanaki Client API`);
+      return null;
+    }
+    throw err;
+  }
+}
 
 function startLauncherApi(client) {
   const port = parseInt(process.env.LAUNCHER_API_PORT || process.env.SERVER_PORT || "", 10);
@@ -32,6 +45,10 @@ function startLauncherApi(client) {
     console.warn("[launcherApi] ⚠️ MySQL is not enabled — Yazanaki Client API disabled (it needs the members tables)");
     return null;
   }
+
+  const api = loadApi();
+  if (!api) return null;
+  const { createApp, ensureTables } = api;
 
   const app = createApp({
     db,
