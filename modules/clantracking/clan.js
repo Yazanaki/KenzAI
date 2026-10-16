@@ -31,8 +31,8 @@ module.exports = {
             .setName("applicationmode")
             .setDescription("Application mode for this clan")
             .addChoices(
-              { name: "Manual (staff handle everything)", value: "manual" },
-              { name: "Timed (7 days of guidelines)", value: "timed" }
+              { name: "Manual (staff accept manually)", value: "manual" },
+              { name: "Automatic (auto-accept after onboarding)", value: "automatic" }
             )
             .setRequired(false)
         )
@@ -52,8 +52,8 @@ module.exports = {
             .setName("applicationmode")
             .setDescription("New application mode for this clan")
             .addChoices(
-              { name: "Manual (staff handle everything)", value: "manual" },
-              { name: "Timed (7 days of guidelines)", value: "timed" }
+              { name: "Manual (staff accept manually)", value: "manual" },
+              { name: "Automatic (auto-accept after onboarding)", value: "automatic" }
             )
             .setRequired(false)
         )
@@ -148,7 +148,7 @@ module.exports = {
       const clanRole = interaction.options.getRole("clanrole");
       const applicationModeOption = interaction.options.getString("applicationmode");
 
-      const applicationMode = applicationModeOption === "timed" ? "timed" : "manual";
+      const applicationMode = applicationModeOption === "automatic" ? "automatic" : "manual";
 
       if (clans[guildId]) {
         return interaction.editReply({
@@ -243,7 +243,7 @@ module.exports = {
             response += `   Set it with \`/clan edit clan:${abbr} clanrole:@Role\`\n`;
           }
 
-          const modeLabel = applicationMode === "timed" ? "Timed (7 days of guidelines)" : "Manual";
+          const modeLabel = applicationMode === "automatic" ? "Automatic" : "Manual";
           response += `\n📝 Application Mode: **${modeLabel}**\n`;
 
           response += `\n📊 Residents: 0 (use /clan sync-residents to populate from existing members)`;
@@ -351,9 +351,9 @@ module.exports = {
         const oldMode = clan.applicationMode || "manual";
         if (newApplicationMode !== oldMode) {
           clan.applicationMode = newApplicationMode;
-          const oldLabel = oldMode === "timed" ? "Timed (7 days of guidelines)" : "Manual";
-          const newLabel = newApplicationMode === "timed" ? "Timed (7 days of guidelines)" : "Manual";
-          changes.push(`📝 Application Mode: \`${oldLabel}\` → \`${newLabel}\``);
+          // Legacy "timed" (never implemented) is treated as Manual.
+          const modeLabel = (m) => (m === "automatic" ? "Automatic" : "Manual");
+          changes.push(`📝 Application Mode: \`${modeLabel(oldMode)}\` → \`${modeLabel(newApplicationMode)}\``);
         }
       }
 
@@ -497,7 +497,7 @@ module.exports = {
 
       const size = `\`${guild.memberCount}\``;
       const appMode = clan.applicationMode || "manual";
-      const appModeLabel = appMode === "timed" ? "Timed (7 days of guidelines)" : "Manual";
+      const appModeLabel = appMode === "automatic" ? "Automatic" : "Manual";
 
       let invite = clan.invite || "#";
       try {
@@ -622,7 +622,7 @@ module.exports = {
           const yazanakiStatus = c.yazanakiRoleId ? "✅" : "❌";
           const clanStatus = c.clanRoleId ? "✅" : "⚠️";
           const residentCount = c.residents || 0;
-          const mode = c.applicationMode === "timed" ? "Timed" : "Manual";
+          const mode = c.applicationMode === "automatic" ? "Automatic" : "Manual";
           return `${yazanakiStatus}${clanStatus} [${c.abbr}: ${c.name}](${invite}) - ${residentCount} residents - Mode: ${mode}`;
         }).join("\n"))
         .setFooter({ text: "✅ = Set | ❌ = Missing Yazanaki role | ⚠️ = Missing clan role" });

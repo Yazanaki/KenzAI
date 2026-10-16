@@ -20,6 +20,7 @@ const { acceptApplicant } = require("./acceptedapplicants.js");
 const { checkApplicationEligibility } = require("../membertracking/memberkickban");
 const { loadRolesConfig } = require("../roles/roledetector");
 const draftConfig = require("../empire/draftconfig");
+const onboardingFlow = require("../onboarding/onboardingflow");
 
 // Yazanaki Empire Guild ID (used for Royalty role check)
 const YAZANAKI_EMPIRE_GUILD_ID = draftConfig.YAZANAKI_EMPIRE_GUILD_ID;
@@ -656,24 +657,6 @@ module.exports = {
         )
         .setColor("#000000");
 
-      const termsEmbed = new EmbedBuilder()
-        .setTitle("Pre-Application Process")
-        .setDescription(
-          "**__Please do these steps:__**\n\n" +
-            "1. **__Read theConstitution__**\n" +
-            "> [Yazanaki Empire Constitution](https://docs.google.com/document/d/1rDxBfjuo2fkrK_LGpmce3vEPy-ImDIDZ-FFJwhDE6mE/edit)\n\n" +
-            "2. **__Join the Yazanaki Empire Discord__**\n" +
-              "> [Click here to join](https://discord.gg/yazanaki-1220847061797179524)\n\n" +
-            "3. **__Follow the Guidelines__**\n" +
-              "  **__Terms__**\n" +
-              "  By applying, you vow to uphold all Yazanakian values.\n\n" +
-              "  **__Rules__**\n" +
-              "  - Don't ping staff unnecessarily\n" +
-              "  - No spam\n" +
-              "  - Be respectful"
-        )
-        .setColor("#000000");
-
       const controlRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("close_ticket")
@@ -689,12 +672,28 @@ module.exports = {
           .setStyle(ButtonStyle.Danger)
       );
 
-      // Ping applicant in message content so they actually get notified
-      await channel.send({
-        content: `<@${interaction.user.id}>`,
-        embeds: [infoEmbed, termsEmbed],
+      // Post the staff-facing info embed + Accept/Reject/Close controls.
+      // Keep a handle on this message so onboarding can disable the
+      // Accept/Reject buttons if it auto-accepts (automatic clans).
+      const controlMessage = await channel.send({
+        embeds: [infoEmbed],
         components: [controlRow]
       });
+
+      // Kick off the interactive onboarding flow for the applicant. This
+      // replaces the old static "Pre-Application Process" embed: the applicant
+      // is walked through the Constitution, key commands, the clan's channels,
+      // joining the Empire, and the Empire's channels — then returned here.
+      try {
+        await onboardingFlow.startOnboarding(
+          interaction.client,
+          channel,
+          { discordId: interaction.user.id, server: guild.id },
+          controlMessage.id
+        );
+      } catch (err) {
+        console.error("[application] ❌ Failed to start onboarding:", err);
+      }
 
       await interaction.editReply({
         content: `✅ Your application has been created: ${channel}`,

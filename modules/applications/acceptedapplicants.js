@@ -452,3 +452,6 @@ module.exports.acceptApplicant = async function (discordId, client = null) {
   
   return { success: true, empireId, clan, joinDate: closeDate };
 };
+
+// Exported for reuse by the onboarding flow's "I've joined" gate.
+module.exports.checkInYazanaki = checkInYazanaki;

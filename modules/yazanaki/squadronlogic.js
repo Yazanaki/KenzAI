@@ -661,11 +661,14 @@ function canManage(member, squadron) {
  * Build a render tree (root = HG) including recruits attached to their soldiers.
  * @param {object} squadron
  * @param {object} invites
- * @param {object} opts { info: (id)=>({name, avatarURL, present}), colorByTier }
+ * @param {object} opts { info, colorByTier, includeRecruit }
+ *   includeRecruit(id) -> boolean gate applied to recruit nodes (default: all).
+ *   Use it to only render recruits who are real current members.
  */
 function buildTreeModel(squadron, invites = readInvites(), opts = {}) {
   const info = opts.info || (() => ({}));
   const colorByTier = opts.colorByTier || {};
+  const includeRecruit = opts.includeRecruit || (() => true);
   const nodes = squadron.nodes || {};
 
   function make(id, tier) {
@@ -693,7 +696,10 @@ function buildTreeModel(squadron, invites = readInvites(), opts = {}) {
     }
     if (node.tier === TIER.IMPERIAL_ARMY) {
       const recs = Object.entries(invites)
-        .filter(([rid, r]) => r && r.status === "placed" && r.soldierId === node.id && r.treeId === squadron.id && !nodes[rid])
+        .filter(
+          ([rid, r]) =>
+            r && r.status === "placed" && r.soldierId === node.id && r.treeId === squadron.id && !nodes[rid] && includeRecruit(rid)
+        )
         .map(([rid]) => make(rid, TIER.RECRUIT));
       recs.sort((a, b) => a.name.localeCompare(b.name));
       for (const r of recs) node.children.push(r);
@@ -770,6 +776,7 @@ function buildChainModel(memberId, opts = {}) {
 
   const info = opts.info || (() => ({}));
   const colorByTier = opts.colorByTier || {};
+  const includeRecruit = opts.includeRecruit || (() => true);
   const make = (id, tier) => {
     const meta = info(id) || {};
     return {
@@ -793,7 +800,10 @@ function buildChainModel(memberId, opts = {}) {
     else prev.children.push(node);
     prev = node;
   }
-  for (const c of ctx.children) prev.children.push(make(c.id, c.tier));
+  for (const c of ctx.children) {
+    if (c.tier === TIER.RECRUIT && !includeRecruit(c.id)) continue;
+    prev.children.push(make(c.id, c.tier));
+  }
 
   return { model: root, selfId: ctx.memberId, tree: ctx.tree };
 }

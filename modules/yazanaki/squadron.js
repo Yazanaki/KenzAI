@@ -74,6 +74,28 @@ function tierLabelOf(tier) {
   return L.TIER_LABEL[tier] || tier;
 }
 
+/**
+ * A recruit is only drawn if they're a REAL current member: present in the
+ * Yazanaki guild AND an accepted member whose rank is Recruit. This filters out
+ * phantoms — people invited but never accepted, or who have since left.
+ */
+function realRecruitPredicate(guildMembers, memberData) {
+  return (id) => {
+    if (!guildMembers.has(id)) return false;
+    return String(memberData[id]?.YazanakiRank || "").trim().toLowerCase() === "recruit";
+  };
+}
+
+/** Count nodes per tier in a built render model (matches what's drawn). */
+function countTiers(model) {
+  const counts = { general: 0, captain: 0, imperial_army: 0, recruit: 0 };
+  (function walk(n) {
+    if (counts[n.tier] != null) counts[n.tier] += 1;
+    for (const c of n.children) walk(c);
+  })(model);
+  return counts;
+}
+
 /** Resolve the caller's Empire-guild member (for role/permission checks). */
 async function callerEmpireMember(guild, userId) {
   return guild.members.fetch(userId).catch(() => null);
@@ -176,7 +198,11 @@ async function handleView(interaction, guild, colorByTier) {
   const targetMember = members.get(target.id);
   if (targetMember && !L.findMemberTree(target.id)) L.ensureTreeForMember(targetMember);
 
-  const built = L.buildChainModel(target.id, { info: infoFrom(members, memberData), colorByTier });
+  const built = L.buildChainModel(target.id, {
+    info: infoFrom(members, memberData),
+    colorByTier,
+    includeRecruit: realRecruitPredicate(members, memberData),
+  });
 
   if (!built) {
     return interaction.editReply({
@@ -229,17 +255,19 @@ async function handleTree(interaction, guild, colorByTier) {
     });
   }
 
-  const model = L.buildTreeModel(squadron, L.readInvites(), { info: infoFrom(members, memberData), colorByTier });
+  const model = L.buildTreeModel(squadron, L.readInvites(), {
+    info: infoFrom(members, memberData),
+    colorByTier,
+    includeRecruit: realRecruitPredicate(members, memberData),
+  });
 
   const hg = members.get(squadron.highGeneralId);
   const treeName = squadron.name || (hg ? `${hg.displayName}'s Command` : "Squadron");
-  const rows = L.listTrees().find((r) => r.squadron.id === squadron.id);
-  const c = rows ? rows.counts : { general: 0, captain: 0, imperial_army: 0 };
-  const recruits = rows ? rows.recruits : 0;
+  const counts = countTiers(model);
 
   const buffer = await renderTree(model, {
     title: treeName,
-    subtitle: `${c.general} Generals · ${c.captain} Captains · ${c.imperial_army} Soldiers · ${recruits} Recruits`,
+    subtitle: `${counts.general} Generals · ${counts.captain} Captains · ${counts.imperial_army} Soldiers · ${counts.recruit} Recruits`,
     highlightId: target.id,
   });
 
