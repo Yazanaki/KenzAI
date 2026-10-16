@@ -17,7 +17,7 @@
     "discord-html-transcripts": "3.3.0",
     "discord.js": "^14.27.0",
     "dotenv": "^16.6.1",
-    "fast-average-color-node": "^3.1.0",
+    "fast-average-color-node": "^3.3.0",
     "jimp": "^1.6.1",
     "mysql2": "^3.23.1",
     "node-vibrant": "^4.0.3"
