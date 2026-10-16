@@ -19,7 +19,7 @@
     "dotenv": "^16.6.1",
     "fast-average-color-node": "^3.1.0",
     "jimp": "^1.6.1",
-    "mysql2": "^3.14.1",
+    "mysql2": "^3.23.1",
     "node-vibrant": "^4.0.3"
   }
 }
