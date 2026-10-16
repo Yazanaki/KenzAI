@@ -166,7 +166,50 @@ function drawConnectors(ctx, all, xOf, yOf) {
   }
 }
 
+/** A collapsed group ("+3 Captains", "5 Soldiers · 12 Recruits") drawn as a stack. */
+function drawBundle(ctx, node, cx, top, boxW) {
+  const accent = tierColor(node);
+  const x = cx - boxW / 2;
+
+  // Stacked cards behind, to signal a group.
+  for (let k = 2; k >= 1; k--) {
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = CARD_BG;
+    roundRectPath(ctx, x + k * 5, top - k * 5, boxW, BOX_H, 12);
+    ctx.fill();
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Main card with a dashed accent border.
+  ctx.fillStyle = CARD_BG;
+  roundRectPath(ctx, x, top, boxW, BOX_H, 12);
+  ctx.fill();
+  ctx.save();
+  ctx.setLineDash([5, 4]);
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1.6;
+  roundRectPath(ctx, x, top, boxW, BOX_H, 12);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = accent;
+  ctx.font = "bold 19px sans-serif";
+  ctx.fillText(truncate(ctx, node.name || "", boxW - 14), cx, top + (node.sub ? 46 : BOX_H / 2 + 7));
+  if (node.sub) {
+    ctx.fillStyle = TEXT_DIM;
+    ctx.font = "12px sans-serif";
+    ctx.fillText(truncate(ctx, node.sub, boxW - 14), cx, top + 68);
+  }
+}
+
 function drawNode(ctx, node, cx, top, boxW, images, highlightId) {
+  if (node.bundle) return drawBundle(ctx, node, cx, top, boxW);
+
   const x = cx - boxW / 2;
   const accent = tierColor(node);
   const isFocus = highlightId && node.id === highlightId;

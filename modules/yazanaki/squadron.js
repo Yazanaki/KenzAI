@@ -86,16 +86,6 @@ function realRecruitPredicate(guildMembers, memberData) {
   };
 }
 
-/** Count nodes per tier in a built render model (matches what's drawn). */
-function countTiers(model) {
-  const counts = { general: 0, captain: 0, imperial_army: 0, recruit: 0 };
-  (function walk(n) {
-    if (counts[n.tier] != null) counts[n.tier] += 1;
-    for (const c of n.children) walk(c);
-  })(model);
-  return counts;
-}
-
 /** Resolve the caller's Empire-guild member (for role/permission checks). */
 async function callerEmpireMember(guild, userId) {
   return guild.members.fetch(userId).catch(() => null);
@@ -255,19 +245,24 @@ async function handleTree(interaction, guild, colorByTier) {
     });
   }
 
-  const model = L.buildTreeModel(squadron, L.readInvites(), {
-    info: infoFrom(members, memberData),
-    colorByTier,
-    includeRecruit: realRecruitPredicate(members, memberData),
-  });
+  const invites = L.readInvites();
+  const includeRecruit = realRecruitPredicate(members, memberData);
+  const buildOpts = { info: infoFrom(members, memberData), colorByTier, includeRecruit };
+
+  // Whole-squadron totals (drive the >8 compaction trigger and the subtitle).
+  const totals = L.countMembers(squadron, invites, includeRecruit);
+  const COMPACT_AFTER = 8;
+  const model =
+    totals.total > COMPACT_AFTER
+      ? L.buildCompactModel(squadron, target.id, invites, buildOpts)
+      : L.buildTreeModel(squadron, invites, buildOpts);
 
   const hg = members.get(squadron.highGeneralId);
   const treeName = squadron.name || (hg ? `${hg.displayName}'s Command` : "Squadron");
-  const counts = countTiers(model);
 
   const buffer = await renderTree(model, {
     title: treeName,
-    subtitle: `${counts.general} Generals · ${counts.captain} Captains · ${counts.imperial_army} Soldiers · ${counts.recruit} Recruits`,
+    subtitle: `${totals.general} Generals · ${totals.captain} Captains · ${totals.imperial_army} Soldiers · ${totals.recruit} Recruits`,
     highlightId: target.id,
   });
 

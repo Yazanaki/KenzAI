@@ -808,6 +808,153 @@ function buildChainModel(memberId, opts = {}) {
   return { model: root, selfId: ctx.memberId, tree: ctx.tree };
 }
 
+/** Count real members per tier in a squadron (officers from nodes, recruits filtered). */
+function countMembers(squadron, invites = readInvites(), includeRecruit = () => true) {
+  const counts = { general: 0, captain: 0, imperial_army: 0, recruit: 0 };
+  const nodes = squadron.nodes || {};
+  for (const n of Object.values(nodes)) if (counts[n.tier] != null) counts[n.tier] += 1;
+  for (const [rid, r] of Object.entries(invites)) {
+    if (r && r.status === "placed" && r.treeId === squadron.id && !nodes[rid] && includeRecruit(rid)) counts.recruit += 1;
+  }
+  counts.total = 1 + counts.general + counts.captain + counts.imperial_army + counts.recruit;
+  return counts;
+}
+
+/**
+ * Build a COMPACT render model for a large squadron, focused on one member.
+ *   - Viewing the High General: show HG -> Generals -> Captains in full, and
+ *     bundle each Captain's Imperial Soldiers + Recruits into one chip.
+ *   - Viewing anyone lower: show the spine (HG -> focus) in full, bundle the
+ *     off-path siblings at each level, and expand the focus's own downline
+ *     (a Captain shows all soldiers + recruits; a General shows its captains
+ *     with soldier/recruit chips; a Soldier shows its recruits).
+ * Bundle node: { id:"bundle:*", tier, bundle:true, count, name, sub?, ... }.
+ */
+function buildCompactModel(squadron, focusId, invites = readInvites(), opts = {}) {
+  const info = opts.info || (() => ({}));
+  const colorByTier = opts.colorByTier || {};
+  const includeRecruit = opts.includeRecruit || (() => true);
+  const nodes = squadron.nodes || {};
+  const PLURAL = { general: "Generals", captain: "Captains", imperial_army: "Soldiers", recruit: "Recruits" };
+
+  const make = (id, tier) => {
+    const meta = info(id) || {};
+    return {
+      id,
+      tier,
+      name: meta.name || `User ${id}`,
+      avatarURL: meta.avatarURL || null,
+      present: meta.present !== false,
+      color: colorByTier[tier] || null,
+      children: [],
+    };
+  };
+  const bundleNode = (key, tier, extra) => ({
+    id: `bundle:${key}`,
+    tier,
+    bundle: true,
+    present: true,
+    color: colorByTier[tier] || null,
+    children: [],
+    ...extra,
+  });
+
+  const recruitsUnder = (soldierId) =>
+    Object.keys(invites).filter((rid) => {
+      const r = invites[rid];
+      return r && r.status === "placed" && r.soldierId === soldierId && r.treeId === squadron.id && !nodes[rid] && includeRecruit(rid);
+    });
+
+  // One chip summarizing a captain's soldiers + recruits (or null if none).
+  const soldierChip = (captainId) => {
+    const soldiers = childrenOf(squadron, captainId).filter((cid) => nodes[cid].tier === TIER.IMPERIAL_ARMY);
+    let rc = 0;
+    for (const s of soldiers) rc += recruitsUnder(s).length;
+    if (!soldiers.length && !rc) return null;
+    return bundleNode(`${captainId}:below`, TIER.IMPERIAL_ARMY, {
+      name: `${soldiers.length} ${soldiers.length === 1 ? "Soldier" : "Soldiers"}`,
+      sub: rc ? `${rc} ${rc === 1 ? "Recruit" : "Recruits"}` : null,
+      count: soldiers.length,
+    });
+  };
+
+  // Full subtree under an officer (everyone shown).
+  const buildFull = (id, tier) => {
+    const n = make(id, tier);
+    for (const cid of childrenOf(squadron, id)) n.children.push(buildFull(cid, nodes[cid].tier));
+    if (tier === TIER.IMPERIAL_ARMY) for (const rid of recruitsUnder(id)) n.children.push(make(rid, TIER.RECRUIT));
+    return n;
+  };
+
+  // Officer subtree but with soldiers + recruits collapsed into a chip per captain.
+  const buildBundledBelow = (id, tier) => {
+    const n = make(id, tier);
+    if (tier === TIER.CAPTAIN) {
+      const chip = soldierChip(id);
+      if (chip) n.children.push(chip);
+      return n;
+    }
+    for (const cid of childrenOf(squadron, id)) n.children.push(buildBundledBelow(cid, nodes[cid].tier));
+    return n;
+  };
+
+  // Resolve focus tier (recruits live in invites, not nodes).
+  const recInfo = invites[focusId];
+  let focusTier;
+  if (nodes[focusId]) focusTier = nodes[focusId].tier;
+  else if (focusId === squadron.highGeneralId) focusTier = TIER.HIGH_GENERAL;
+  else if (recInfo && recInfo.status === "placed" && recInfo.treeId === squadron.id) focusTier = TIER.RECRUIT;
+  else focusTier = TIER.HIGH_GENERAL;
+
+  // Overview: focus is the High General.
+  if (focusTier === TIER.HIGH_GENERAL) return buildBundledBelow(squadron.highGeneralId, TIER.HIGH_GENERAL);
+
+  // Build the spine from HG down to the focus.
+  const spine = [];
+  {
+    let cur = focusTier === TIER.RECRUIT ? recInfo.soldierId : focusId;
+    const guard = new Set();
+    while (cur && !guard.has(cur)) {
+      guard.add(cur);
+      spine.unshift(cur);
+      const inf = findNodeInfo(cur, squadron);
+      cur = inf ? inf.parentId : null;
+    }
+    if (focusTier === TIER.RECRUIT) spine.push(focusId);
+  }
+  const tierOf = (id) => (id === focusId && focusTier === TIER.RECRUIT ? TIER.RECRUIT : (findNodeInfo(id, squadron) || {}).tier);
+  const spineNodes = spine.map((id) => make(id, tierOf(id)));
+  for (let i = 0; i < spineNodes.length - 1; i++) spineNodes[i].children.push(spineNodes[i + 1]);
+
+  // Off-path sibling chips at each spine level (children of the spine node that
+  // are not the next spine node), grouped by tier.
+  for (let i = 0; i < spine.length - 1; i++) {
+    const id = spine[i];
+    const nextId = spine[i + 1];
+    const offByTier = {};
+    if (tierOf(id) === TIER.IMPERIAL_ARMY) {
+      for (const rid of recruitsUnder(id)) if (rid !== nextId) (offByTier[TIER.RECRUIT] ||= []).push(rid);
+    } else {
+      for (const cid of childrenOf(squadron, id)) if (cid !== nextId) (offByTier[nodes[cid].tier] ||= []).push(cid);
+    }
+    for (const [ct, arr] of Object.entries(offByTier)) {
+      spineNodes[i].children.push(bundleNode(`${id}:${ct}`, ct, { name: `+${arr.length} ${PLURAL[ct]}`, count: arr.length }));
+    }
+  }
+
+  // Expand the focus's own downline.
+  const focusNode = spineNodes[spineNodes.length - 1];
+  if (focusTier === TIER.GENERAL) {
+    for (const cid of childrenOf(squadron, focusId)) focusNode.children.push(buildBundledBelow(cid, TIER.CAPTAIN));
+  } else if (focusTier === TIER.CAPTAIN) {
+    for (const cid of childrenOf(squadron, focusId)) focusNode.children.push(buildFull(cid, TIER.IMPERIAL_ARMY));
+  } else if (focusTier === TIER.IMPERIAL_ARMY) {
+    for (const rid of recruitsUnder(focusId)) focusNode.children.push(make(rid, TIER.RECRUIT));
+  }
+
+  return spineNodes[0];
+}
+
 /** Summary rows for `/squadron list`. */
 function listTrees() {
   const squadrons = readSquadrons();
@@ -868,6 +1015,8 @@ module.exports = {
   // render models
   buildTreeModel,
   buildChainModel,
+  buildCompactModel,
+  countMembers,
   getMemberContext,
   listTrees,
 };
