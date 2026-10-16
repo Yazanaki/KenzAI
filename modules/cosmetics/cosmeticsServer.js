@@ -21,6 +21,7 @@
 const http = require("http");
 const crypto = require("crypto");
 const cosmeticsService = require("./cosmeticsService");
+const { sendLoginCode } = require("../launcher/loginCode");
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -49,6 +50,10 @@ function authorized(req) {
 function statusForReason(reason) {
   switch (reason) {
     case "not_member":      return 403;
+    case "user_not_found":  return 404;
+    case "dm_closed":       return 422;
+    case "bot_not_ready":
+    case "dm_failed":       return 502;
     case "db_unavailable":  return 503;
     case "unavailable":
     case "already_owned":
@@ -60,7 +65,8 @@ function statusForReason(reason) {
   }
 }
 
-function startCosmeticsServer() {
+// `client` is optional: without it /internal/login-code answers bot_not_ready.
+function startCosmeticsServer(client) {
   if (!process.env.COSMETICS_INTERNAL_SECRET) {
     console.warn("[cosmeticsServer] ⚠️ COSMETICS_INTERNAL_SECRET not set — internal cosmetics endpoint disabled");
     return null;
@@ -87,7 +93,7 @@ function startCosmeticsServer() {
     }
 
     const handler = HANDLERS[req.url];
-    if (!handler) {
+    if (!handler && req.url !== "/internal/login-code") {
       return jsonResponse(res, 404, { ok: false, error: "unknown_endpoint" });
     }
 
@@ -97,6 +103,17 @@ function startCosmeticsServer() {
       body = raw.length ? JSON.parse(raw.toString("utf8")) : {};
     } catch {
       return jsonResponse(res, 400, { ok: false, error: "invalid_json" });
+    }
+
+    // Launcher sign-in codes have their own body shape: { discordId, code, empireId, expiresInMinutes }.
+    if (req.url === "/internal/login-code") {
+      try {
+        const result = await sendLoginCode(client, body);
+        return jsonResponse(res, result.ok ? 200 : statusForReason(result.reason), result);
+      } catch (err) {
+        console.error("[cosmeticsServer] ❌ login-code error:", err);
+        return jsonResponse(res, 500, { ok: false, error: "internal_error" });
+      }
     }
 
     const discordId = String(body.discordId || "").trim();
