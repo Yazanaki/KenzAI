@@ -418,6 +418,146 @@ const stores = {
         ),
     }
   ),
+
+  // ===== Discord module (moderation, leveling, giveaways, invites, stats) =====
+
+  // Per-guild config for every discord-module feature (one row per guild).
+  discord_settings: defineStore(
+    "discord_settings",
+    "discord_settings.json",
+    "discord_settings",
+    "guild_id",
+    null
+  ),
+
+  // Moderation infractions — keyed by generated case id.
+  discord_infractions: defineStore(
+    "discord_infractions",
+    "discord_infractions.json",
+    "discord_infractions",
+    "case_id",
+    (id, v) => ({
+      guild_id: str(v.guildId),
+      user_id: str(v.userId),
+      moderator_id: str(v.moderatorId),
+      action: str(v.action),
+      active: bool(v.active !== false),
+      logged_at: dt(v.createdAt),
+    })
+  ),
+
+  // Leveling XP (message + voice) — keyed by "<guildId>:<userId>".
+  discord_levels: defineStore(
+    "discord_levels",
+    "discord_levels.json",
+    "discord_levels",
+    "member_key",
+    (id, v) => ({
+      guild_id: str(v.guildId),
+      user_id: str(v.userId),
+      xp: int(v.xp, 0),
+      level: int(v.level, 0),
+      messages: int(v.messages, 0),
+      voice_seconds: int(v.voiceSeconds, 0),
+    })
+  ),
+
+  // Giveaways — keyed by the giveaway message id.
+  discord_giveaways: defineStore(
+    "discord_giveaways",
+    "discord_giveaways.json",
+    "discord_giveaways",
+    "message_id",
+    (id, v) => ({
+      guild_id: str(v.guildId),
+      channel_id: str(v.channelId),
+      status: str(v.status),
+      ends_at: dt(v.endsAt),
+    })
+  ),
+
+  // Reusable giveaway templates — keyed by "<guildId>:<name>".
+  discord_giveaway_templates: defineStore(
+    "discord_giveaway_templates",
+    "discord_giveaway_templates.json",
+    "discord_giveaway_templates",
+    "template_key",
+    (id, v) => ({
+      guild_id: str(v.guildId),
+      name: str(v.name),
+    })
+  ),
+
+  // Per-user invite attribution + counts — keyed by "<guildId>:<userId>".
+  discord_invites: defineStore(
+    "discord_invites",
+    "discord_invites.json",
+    "discord_invites",
+    "member_key",
+    (id, v) => ({
+      guild_id: str(v.guildId),
+      user_id: str(v.userId),
+      regular: int(v.regular, 0),
+      fake: int(v.fake, 0),
+      left_count: int(v.left, 0),
+      bonus: int(v.bonus, 0),
+    })
+  ),
+
+  // Per-guild statistics counters (totals + daily buckets in `data`).
+  discord_stats: defineStore(
+    "discord_stats",
+    "discord_stats.json",
+    "discord_stats",
+    "guild_id",
+    (id, v) => ({
+      joins: int(v.joins, 0),
+      leaves: int(v.leaves, 0),
+      messages: int(v.messages, 0),
+      voice_seconds: int(v.voiceSeconds, 0),
+    })
+  ),
+
+  // Booster self-service roles — keyed by "<guildId>:<userId>".
+  discord_booster_roles: defineStore(
+    "discord_booster_roles",
+    "discord_booster_roles.json",
+    "discord_booster_roles",
+    "member_key",
+    (id, v) => ({
+      guild_id: str(v.guildId),
+      user_id: str(v.userId),
+      role_id: str(v.roleId),
+    })
+  ),
+
+  // Per-member boost counts (for the multi-booster role).
+  discord_boost_counts: defineStore(
+    "discord_boost_counts",
+    "discord_boost_counts.json",
+    "discord_boost_counts",
+    "member_key",
+    (id, v) => ({
+      guild_id: str(v.guildId),
+      user_id: str(v.userId),
+      count: int(v.count, 0),
+    })
+  ),
+
+  // Recurring giveaway schedules — keyed by generated schedule id.
+  discord_giveaway_schedules: defineStore(
+    "discord_giveaway_schedules",
+    "discord_giveaway_schedules.json",
+    "discord_giveaway_schedules",
+    "schedule_id",
+    (id, v) => ({
+      guild_id: str(v.guildId),
+      channel_id: str(v.channelId),
+      template_name: str(v.templateName),
+      enabled: bool(v.enabled !== false),
+      next_run_at: dt(v.nextRunAt),
+    })
+  ),
 };
 
 module.exports = { stores };

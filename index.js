@@ -19,6 +19,7 @@ const { setupPointsEvents } = require('./modules/points/pointsevents');
 const { startBotMonitor } = require('./modules/mcbot/botmonitor');
 const { startCosmeticsServer } = require('./modules/cosmetics/cosmeticsServer');
 const { startLauncherApi } = require('./modules/launcherApi');
+const { initDiscord } = require('./modules/discord/init');
 
 // ============================================================
 // CLIENT SETUP
@@ -31,6 +32,8 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.GuildInvites,
+    GatewayIntentBits.GuildModeration,
   ],
   partials: [
     Partials.Channel,
@@ -73,6 +76,29 @@ for (const file of eventFiles) {
 // ============================================================
 // COMMAND DEPLOYMENT
 // ============================================================
+
+// Recursively collect every .js file under `dir`, returned as paths relative to
+// `dir`. This lets modules organise commands into nested subfolders (e.g. the
+// discord module's moderation/, levels/, giveaways/ trees) instead of being
+// limited to files directly in the module root. Flat modules are unaffected.
+// Files in the current directory are returned BEFORE files in subdirectories
+// (shallow-first). Combined with the first-wins de-dupe in deployCommands, this
+// preserves legacy behaviour where only a module's top-level files were scanned
+// (e.g. modules/mcbot/patreon.js wins over an older nested duplicate).
+function walkJsFiles(dir) {
+  const files = [];
+  const subdirs = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) subdirs.push(entry.name);
+    else if (entry.isFile() && entry.name.endsWith('.js')) files.push(entry.name);
+  }
+  const out = [...files];
+  for (const sub of subdirs) {
+    for (const f of walkJsFiles(path.join(dir, sub))) out.push(path.join(sub, f));
+  }
+  return out;
+}
+
 async function deployCommands(force = false, targetGuildId = null) {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('🔄 LOADING COMMANDS...');
@@ -84,7 +110,7 @@ async function deployCommands(force = false, targetGuildId = null) {
     const folderPath = path.join('./modules', folder);
     if (!fs.statSync(folderPath).isDirectory()) continue;
 
-    const commandFiles = fs.readdirSync(folderPath).filter(file => file.endsWith('.js'));
+    const commandFiles = walkJsFiles(folderPath);
 
     for (const file of commandFiles) {
       const filePath = path.join(folderPath, file);
@@ -92,6 +118,11 @@ async function deployCommands(force = false, targetGuildId = null) {
         delete require.cache[require.resolve(`./${filePath}`)];
         const command = require(`./${filePath}`);
         if ('data' in command && 'execute' in command) {
+          // First-wins de-dupe: a shallower file already claimed this name.
+          if (client.commands.has(command.data.name)) {
+            console.warn(`⚠️ Skipping duplicate command /${command.data.name} from ${folder}/${file} (already loaded)`);
+            continue;
+          }
           client.commands.set(command.data.name, command);
           commands.push(command.data.toJSON());
           console.log(`✅ Loaded: /${command.data.name} (from ${folder}/${file})`);
@@ -272,6 +303,13 @@ client.once('ready', async () => {
 
   console.log("🤖 Starting bot offline monitor...");
   startBotMonitor(client);
+
+  console.log("💬 Starting all-in-one Discord module (moderation, leveling, giveaways, invites, stats)...");
+  try {
+    initDiscord(client);
+  } catch (err) {
+    console.error("❌ Failed to init Discord module:", err.message);
+  }
 });
 
 // ============================================================

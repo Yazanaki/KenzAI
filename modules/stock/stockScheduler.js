@@ -69,9 +69,16 @@ function startStockScheduler() {
   }
   started = true;
 
+  // One-time: migrate any legacy aggregate holdings into per-buy positions.
+  try {
+    require("./stocklogic").migrateLegacyHoldings();
+  } catch (err) {
+    console.error("[stockScheduler] ❌ Legacy holdings migration failed:", err.message);
+  }
+
   const interval = getIntervalMs();
   console.log(
-    `[stockScheduler] 🚀 Clan stock price ticks enabled — every ${(interval / 60000).toFixed(1)}m ` +
+    `[stockScheduler] 🚀 Clan stock candle ticks enabled — every ${(interval / 60000).toFixed(1)}m ` +
     `(first run in ${Math.round(INITIAL_DELAY_MS / 1000)}s)`
   );
 
