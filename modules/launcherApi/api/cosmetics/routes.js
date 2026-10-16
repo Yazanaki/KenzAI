@@ -129,7 +129,7 @@ function create({ db }) {
                 const [ins] = await db.execute(
                     `INSERT IGNORE INTO cosmetic_owned (uuid, cosmetic_id, granted_by) VALUES (?, 'og-cape', 'og')`,
                     [profile.id]);
-                // Wear it straight away the first time, unless a cape is already on.
+                // Wear it straight away the first time, unless a cloak is already on.
                 if (ins.affectedRows === 1) {
                     await db.execute(
                         `INSERT IGNORE INTO cosmetic_equipped (uuid, slot, cosmetic_id) VALUES (?, 'cape', 'og-cape')`,
