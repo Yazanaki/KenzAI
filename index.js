@@ -294,8 +294,8 @@ client.once('ready', async () => {
 
   setupPointsEvents(client);
 
-  console.log("🛒 Starting internal cosmetics endpoint (for the launcher via the API)...");
-  startCosmeticsServer();
+  console.log("🛒 Starting internal endpoint for the launcher via the API (cosmetics + sign-in codes)...");
+  startCosmeticsServer(client);
 
   console.log("🤖 Starting bot offline monitor...");
   startBotMonitor(client);
